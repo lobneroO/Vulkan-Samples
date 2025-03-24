@@ -194,6 +194,9 @@ void OpenGLInterop::prepare_shared_resources()
 #endif
 	}
 
+    std::vector<SharedTexture> images(4);
+	std::vector<ShareHandles>  handles(4);
+    for(size_t i = 0; i < images.size(); i++)
 	{
 		VkExternalMemoryImageCreateInfo external_memory_image_create_info{VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO};
 #if WIN32
@@ -212,16 +215,17 @@ void OpenGLInterop::prepare_shared_resources()
 		imageCreateInfo.extent.width  = SHARED_TEXTURE_DIMENSION;
 		imageCreateInfo.extent.height = SHARED_TEXTURE_DIMENSION;
 		imageCreateInfo.usage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		VK_CHECK(vkCreateImage(deviceHandle, &imageCreateInfo, nullptr, &sharedTexture.image));
+		// VK_CHECK(vkCreateImage(deviceHandle, &imageCreateInfo, nullptr, &sharedTexture.image));
+		VK_CHECK(vkCreateImage(deviceHandle, &imageCreateInfo, nullptr, &images[i].image));
 
 		VkMemoryDedicatedAllocateInfo dedicated_allocate_info;
 		dedicated_allocate_info.sType  = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
 		dedicated_allocate_info.pNext  = nullptr;
 		dedicated_allocate_info.buffer = VK_NULL_HANDLE;
-		dedicated_allocate_info.image  = sharedTexture.image;
+		dedicated_allocate_info.image  = images[i].image;
 
 		VkMemoryRequirements memReqs{};
-		vkGetImageMemoryRequirements(get_device().get_handle(), sharedTexture.image, &memReqs);
+		vkGetImageMemoryRequirements(get_device().get_handle(), images[i].image, &memReqs);
 
 		// In order to export an external handle later, we need to tell it explicitly during memory allocation
 		VkExportMemoryAllocateInfo export_memory_allocate_Info;
@@ -235,17 +239,17 @@ void OpenGLInterop::prepare_shared_resources()
 
 		VkMemoryAllocateInfo memAllocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, &export_memory_allocate_Info};
 
-		memAllocInfo.allocationSize = sharedTexture.allocationSize = memReqs.size;
+		memAllocInfo.allocationSize = images[i].allocationSize = memReqs.size;
 		memAllocInfo.memoryTypeIndex                               = get_device().get_memory_type(memReqs.memoryTypeBits,
 		                                                                                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK(vkAllocateMemory(deviceHandle, &memAllocInfo, nullptr, &sharedTexture.memory));
-		VK_CHECK(vkBindImageMemory(deviceHandle, sharedTexture.image, sharedTexture.memory, 0));
+		VK_CHECK(vkAllocateMemory(deviceHandle, &memAllocInfo, nullptr, &images[i].memory));
+		VK_CHECK(vkBindImageMemory(deviceHandle, images[i].image, images[i].memory, 0));
 
 #if WIN32
 		VkMemoryGetWin32HandleInfoKHR memoryFdInfo{VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR, nullptr,
-		                                           sharedTexture.memory,
+		                                           images[i].memory,
 		                                           VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT};
-		VK_CHECK(vkGetMemoryWin32HandleKHR(deviceHandle, &memoryFdInfo, &shareHandles.memory));
+		VK_CHECK(vkGetMemoryWin32HandleKHR(deviceHandle, &memoryFdInfo, &handles[i].memory));
 #else
 		VkMemoryGetFdInfoKHR memoryFdInfo{VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR, nullptr,
 		                                  sharedTexture.memory,
@@ -267,19 +271,19 @@ void OpenGLInterop::prepare_shared_resources()
 		// samplerCreateInfo.maxAnisotropy = context.deviceFeatures.samplerAnisotropy ? context.deviceProperties.limits.maxSamplerAnisotropy : 1.0f;
 		// samplerCreateInfo.anisotropyEnable = context.deviceFeatures.samplerAnisotropy;
 		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		vkCreateSampler(deviceHandle, &samplerCreateInfo, nullptr, &sharedTexture.sampler);
+		vkCreateSampler(deviceHandle, &samplerCreateInfo, nullptr, &images[i].sampler);
 
 		// Create image view
 		VkImageViewCreateInfo viewCreateInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
 		viewCreateInfo.viewType         = VK_IMAGE_VIEW_TYPE_2D;
-		viewCreateInfo.image            = sharedTexture.image;
+		viewCreateInfo.image            = images[i].image;
 		viewCreateInfo.format           = VK_FORMAT_R8G8B8A8_UNORM;
 		viewCreateInfo.subresourceRange = VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1,
 		                                                          0, 1};
-		vkCreateImageView(deviceHandle, &viewCreateInfo, nullptr, &sharedTexture.view);
+		vkCreateImageView(deviceHandle, &viewCreateInfo, nullptr, &images[i].view);
 
 		with_command_buffer(
-		    [&](VkCommandBuffer image_command_buffer) { vkb::image_layout_transition(image_command_buffer, sharedTexture.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL); },
+		    [&](VkCommandBuffer image_command_buffer) { vkb::image_layout_transition(image_command_buffer, images[i].image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL); },
 		    sharedSemaphores.gl_ready);
 	}
 }

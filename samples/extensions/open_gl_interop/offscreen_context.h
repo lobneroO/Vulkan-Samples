@@ -23,7 +23,7 @@
 
 #include "common/vk_common.h"
 
-constexpr uint32_t SHARED_TEXTURE_DIMENSION = 512;
+constexpr uint32_t SHARED_TEXTURE_DIMENSION = 50;
 
 #ifdef WIN32
 constexpr const char *HOST_MEMORY_EXTENSION_NAME    = VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
